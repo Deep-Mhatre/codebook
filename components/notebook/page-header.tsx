@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Save, Check, RefreshCw } from 'lucide-react';
+import { Save, Check, RefreshCw, Folder } from 'lucide-react';
+import { useUIStore } from '@/lib/store/ui-store';
 
 interface PageHeaderProps {
   notebookName?: string;
@@ -24,6 +25,8 @@ export function PageHeader({
   onTitleChange,
   onSave,
 }: PageHeaderProps) {
+  const { toggleWorkspaceExplorer, workspaceFiles } = useUIStore();
+
   return (
     <div className="mb-6 space-y-2 select-none">
       {/* Top Bar inside Header: Category Hierarchy Path & Save Controls */}
@@ -36,8 +39,23 @@ export function PageHeader({
           <span className="text-[var(--foreground)]">{pageTitle}</span>
         </div>
 
-        {/* Save Status & Action Controls */}
+        {/* Save Status, Workspace Explorer & Action Controls */}
         <div className="flex items-center gap-2">
+          {/* Workspace Explorer Trigger Button */}
+          <button
+            onClick={toggleWorkspaceExplorer}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs border border-[var(--border)] bg-[var(--sidebar)] hover:bg-[var(--hover)] text-[var(--foreground)] rounded-md font-medium transition-colors cursor-pointer"
+            title="Open Session Workspace Files"
+          >
+            <Folder className="w-3.5 h-3.5 text-amber-500" />
+            <span className="hidden sm:inline">Files</span>
+            {workspaceFiles.length > 0 && (
+              <span className="px-1.5 py-0.2 text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full">
+                {workspaceFiles.length}
+              </span>
+            )}
+          </button>
+
           {/* Status Badge */}
           <div className="text-xs flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-[var(--border)] bg-[var(--sidebar)] text-[var(--muted-foreground)]">
             {isSaving ? (
@@ -48,7 +66,7 @@ export function PageHeader({
             ) : isDirty ? (
               <>
                 <span className="w-2 h-2 rounded-full bg-amber-500 inline-block animate-pulse" />
-                <span className="text-amber-500 font-medium">Unsaved changes</span>
+                <span className="text-amber-500 font-medium">Unsaved</span>
               </>
             ) : (
               <>

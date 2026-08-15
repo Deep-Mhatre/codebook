@@ -29,30 +29,34 @@ export async function proxy(request: NextRequest) {
   });
 
   const { data: { user } } = await supabase.auth.getUser();
-
   const pathname = request.nextUrl.pathname;
 
-  // Allow auth callback, static assets, and api execution during dev testing
+  // Allow static assets, API, auth callbacks, landing page, login, and signup
   if (
+    pathname === '/' ||
+    pathname.startsWith('/landing') ||
+    pathname.startsWith('/about') ||
+    pathname.startsWith('/docs') ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/signup') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
     pathname.includes('.')
   ) {
+    // If authenticated user visits /login or /signup, redirect to notebook workspace
+    if (user && (pathname.startsWith('/login') || pathname.startsWith('/signup'))) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/notebook';
+      return NextResponse.redirect(url);
+    }
     return response;
   }
 
-  // Redirect unauthenticated users to /login if trying to access notebook pages
-  if (!user && !pathname.startsWith('/login') && !pathname.startsWith('/signup')) {
+  // Redirect unauthenticated users attempting to access protected notebook routes
+  if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    return NextResponse.redirect(url);
-  }
-
-  // Redirect authenticated users away from /login or /signup to dashboard / root
-  if (user && (pathname.startsWith('/login') || pathname.startsWith('/signup'))) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/';
     return NextResponse.redirect(url);
   }
 

@@ -1,5 +1,12 @@
 import { create } from 'zustand';
 
+export interface WorkspaceFile {
+  name: string;
+  size: number;
+  type?: string;
+  url?: string;
+}
+
 interface UIState {
   isSidebarOpen: boolean;
   activeNotebookId: string | null;
@@ -8,6 +15,8 @@ interface UIState {
   expandedTopicIds: Record<string, boolean>;
   isSearchOpen: boolean;
   isScratchpadOpen: boolean;
+  isWorkspaceExplorerOpen: boolean;
+  workspaceFiles: WorkspaceFile[];
   
   // Actions
   toggleSidebar: () => void;
@@ -19,6 +28,9 @@ interface UIState {
   toggleSearch: () => void;
   setScratchpadOpen: (open: boolean) => void;
   toggleScratchpad: () => void;
+  setWorkspaceExplorerOpen: (open: boolean) => void;
+  toggleWorkspaceExplorer: () => void;
+  setWorkspaceFiles: (files: WorkspaceFile[]) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -35,6 +47,8 @@ export const useUIStore = create<UIState>((set) => ({
   },
   isSearchOpen: false,
   isScratchpadOpen: false,
+  isWorkspaceExplorerOpen: false,
+  workspaceFiles: [],
 
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
@@ -66,4 +80,8 @@ export const useUIStore = create<UIState>((set) => ({
   
   setScratchpadOpen: (open) => set({ isScratchpadOpen: open }),
   toggleScratchpad: () => set((state) => ({ isScratchpadOpen: !state.isScratchpadOpen })),
+
+  setWorkspaceExplorerOpen: (open) => set({ isWorkspaceExplorerOpen: open }),
+  toggleWorkspaceExplorer: () => set((state) => ({ isWorkspaceExplorerOpen: !state.isWorkspaceExplorerOpen })),
+  setWorkspaceFiles: (files) => set({ workspaceFiles: files }),
 }));

@@ -5,6 +5,7 @@ import { Topbar } from './topbar';
 import { Sidebar } from './sidebar';
 import { CommandMenu } from '../navigation/command-menu';
 import { Scratchpad } from '../notebook/scratchpad';
+import { WorkspaceExplorer } from '../notebook/workspace-explorer';
 import { Providers } from '@/app/providers';
 
 interface AppShellProps {
@@ -58,6 +59,9 @@ export function AppShell({ children }: AppShellProps) {
 
         {/* Scratchpad Slide-Out Drawer */}
         <Scratchpad />
+
+        {/* Workspace Explorer Drawer */}
+        <WorkspaceExplorer />
 
         {/* Main Workspace Area: Sidebar + Canvas */}
         <div className="flex-1 flex overflow-hidden">

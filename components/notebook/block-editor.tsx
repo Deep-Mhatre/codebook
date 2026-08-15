@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { CodeBlock, ExecutionStatus } from './code-block';
 import { OutputBlock, OutputItem } from './output/output-block';
 import { Plus, Type, Code2, Heading2 } from 'lucide-react';
+import { useUIStore } from '@/lib/store/ui-store';
 
 export interface BlockItem {
   id: string;
@@ -16,6 +17,7 @@ export interface BlockItem {
 
 interface BlockEditorProps {
   initialBlocks?: BlockItem[];
+  pageId?: string;
   onBlocksChange?: (blocks: BlockItem[]) => void;
 }
 
@@ -42,10 +44,12 @@ export function BlockEditor({
       ],
     },
   ],
+  pageId = 'default-page',
   onBlocksChange,
 }: BlockEditorProps) {
   const [blocks, setBlocks] = useState<BlockItem[]>(initialBlocks);
   const [showAddMenuIndex, setShowAddMenuIndex] = useState<number | null>(null);
+  const { setWorkspaceFiles } = useUIStore();
 
   const handleUpdateContent = (id: string, newContent: string) => {
     const updated = blocks.map((b) => (b.id === id ? { ...b, content: newContent } : b));
@@ -63,10 +67,14 @@ export function BlockEditor({
       const res = await fetch('/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language: 'python' }),
+        body: JSON.stringify({ code, language: 'python', session_id: pageId }),
       });
 
       const data = await res.json();
+
+      if (data.workspaceFiles) {
+        setWorkspaceFiles(data.workspaceFiles);
+      }
 
       if (res.ok && data.outputs) {
         setBlocks((prev) =>
