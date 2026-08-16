@@ -54,7 +54,7 @@ def run_code(payload: ExecutePayload):
     )
     return result
 
-@app.websocket("/ws/execute/{session_id}")
+@app.websocket("/ws/execute/{session_id:path}")
 async def websocket_execute_endpoint(websocket: WebSocket, session_id: str):
     await websocket.accept()
     active_sessions[session_id] = websocket
