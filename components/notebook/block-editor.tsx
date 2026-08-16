@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { CodeBlock, ExecutionStatus } from './code-block';
 import { OutputBlock, OutputItem } from './output/output-block';
+import { MediaPermissionBanner } from '../media/media-permission-banner';
+import { captureCameraFrame, recordMicrophoneAudio } from '@/lib/media/media-bridge';
 import { Plus, Type, Code2, Heading2 } from 'lucide-react';
 import { useUIStore } from '@/lib/store/ui-store';
 
@@ -13,6 +15,7 @@ export interface BlockItem {
   language?: string;
   executionStatus?: ExecutionStatus;
   outputs?: OutputItem[];
+  mediaRequest?: { type: 'camera' | 'microphone'; duration?: number } | null;
 }
 
 interface BlockEditorProps {
@@ -58,11 +61,158 @@ export function BlockEditor({
   };
 
   const handleExecuteCode = async (blockId: string, code: string) => {
-    // 1. Mark block status as 'running'
+    // 1. Mark block status as 'running' & clear previous media banners
     setBlocks((prev) =>
-      prev.map((b) => (b.id === blockId ? { ...b, executionStatus: 'running' } : b))
+      prev.map((b) => (b.id === blockId ? { ...b, executionStatus: 'running', mediaRequest: null } : b))
     );
 
+    // Attempt interactive WebSocket execution for camera & microphone support
+    const wsUrl = `ws://localhost:8000/ws/execute/${pageId}`;
+    let socket: WebSocket | null = null;
+    let wsSuccess = false;
+
+    try {
+      socket = new WebSocket(wsUrl);
+
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('WS timeout')), 1500);
+        socket!.onopen = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+        socket!.onerror = (e) => {
+          clearTimeout(timeout);
+          reject(e);
+        };
+      });
+
+      socket.onmessage = async (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+
+          if (msg.type === 'camera_request') {
+            // Show Camera Banner UI
+            setBlocks((prev) =>
+              prev.map((b) => (b.id === blockId ? { ...b, mediaRequest: { type: 'camera' } } : b))
+            );
+
+            // Capture camera frame from browser
+            const res = await captureCameraFrame();
+
+            // Clear Camera Banner UI
+            setBlocks((prev) =>
+              prev.map((b) => (b.id === blockId ? { ...b, mediaRequest: null } : b))
+            );
+
+            if (res.error) {
+              socket?.send(
+                JSON.stringify({
+                  type: 'camera_response',
+                  session_id: pageId,
+                  status: 'error',
+                  error_type: res.error.errorType,
+                  message: res.error.message,
+                })
+              );
+            } else {
+              socket?.send(
+                JSON.stringify({
+                  type: 'camera_response',
+                  session_id: pageId,
+                  status: 'success',
+                  image_data: res.dataUrl,
+                })
+              );
+            }
+          } else if (msg.type === 'microphone_request') {
+            const duration = msg.duration || 5.0;
+
+            // Show Microphone Banner UI
+            setBlocks((prev) =>
+              prev.map((b) =>
+                b.id === blockId ? { ...b, mediaRequest: { type: 'microphone', duration } } : b
+              )
+            );
+
+            // Record audio from browser microphone
+            const res = await recordMicrophoneAudio(duration);
+
+            // Clear Microphone Banner UI
+            setBlocks((prev) =>
+              prev.map((b) => (b.id === blockId ? { ...b, mediaRequest: null } : b))
+            );
+
+            if (res.error) {
+              socket?.send(
+                JSON.stringify({
+                  type: 'microphone_response',
+                  session_id: pageId,
+                  status: 'error',
+                  error_type: res.error.errorType,
+                  message: res.error.message,
+                })
+              );
+            } else {
+              socket?.send(
+                JSON.stringify({
+                  type: 'microphone_response',
+                  session_id: pageId,
+                  status: 'success',
+                  audio_data: res.dataUrl,
+                  sample_rate: res.sampleRate,
+                })
+              );
+            }
+          } else if (msg.type === 'execution_result') {
+            wsSuccess = true;
+            const data = msg.data;
+            if (data.workspaceFiles) {
+              setWorkspaceFiles(data.workspaceFiles);
+            }
+
+            if (data.status === 'success' && data.outputs) {
+              setBlocks((prev) =>
+                prev.map((b) =>
+                  b.id === blockId
+                    ? {
+                        ...b,
+                        executionStatus: 'success',
+                        outputs: data.outputs,
+                        mediaRequest: null,
+                      }
+                    : b
+                )
+              );
+            } else {
+              setBlocks((prev) =>
+                prev.map((b) =>
+                  b.id === blockId
+                    ? {
+                        ...b,
+                        executionStatus: 'error',
+                        outputs: data.outputs || [{ type: 'error', content: data.error || 'Execution failed' }],
+                        mediaRequest: null,
+                      }
+                    : b
+                )
+              );
+            }
+            socket?.close();
+          }
+        } catch (err) {
+          console.warn('WebSocket message error:', err);
+        }
+      };
+
+      // Start execution over WebSocket
+      socket.send(JSON.stringify({ type: 'execute', code, timeout: 35 }));
+      return;
+    } catch (wsErr) {
+      console.warn('WebSocket execution failed, using HTTP POST fallback:', wsErr);
+      if (socket) socket.close();
+    }
+
+    // Fallback HTTP POST execution handler
     try {
       const res = await fetch('/api/execute', {
         method: 'POST',
@@ -84,6 +234,7 @@ export function BlockEditor({
                   ...b,
                   executionStatus: 'success',
                   outputs: data.outputs,
+                  mediaRequest: null,
                 }
               : b
           )
@@ -96,6 +247,7 @@ export function BlockEditor({
                   ...b,
                   executionStatus: 'error',
                   outputs: [{ type: 'error', content: data.error || 'Execution failed' }],
+                  mediaRequest: null,
                 }
               : b
           )
@@ -109,6 +261,7 @@ export function BlockEditor({
                 ...b,
                 executionStatus: 'error',
                 outputs: [{ type: 'error', content: err.message || 'Network error' }],
+                mediaRequest: null,
               }
             : b
         )
@@ -164,6 +317,11 @@ export function BlockEditor({
           {/* Monaco Code Block */}
           {block.type === 'code' && (
             <div className="space-y-2">
+              <MediaPermissionBanner
+                type={block.mediaRequest?.type || null}
+                duration={block.mediaRequest?.duration}
+              />
+
               <CodeBlock
                 id={block.id}
                 initialCode={block.content}

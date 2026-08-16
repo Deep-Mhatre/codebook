@@ -33,6 +33,11 @@ try:
 except Exception:
     pass
 
+# Add runner directory to sys.path to enable importing internal codebook package
+_runner_dir = os.path.dirname(os.path.abspath(__file__))
+if _runner_dir not in sys.path:
+    sys.path.insert(0, _runner_dir)
+
 # Add current working directory to sys.path to enable importing local module files (e.g. import helper)
 if os.getcwd() not in sys.path:
     sys.path.insert(0, os.getcwd())
@@ -70,6 +75,8 @@ def execute_python_code(code: str, timeout: int = 10, session_id: Optional[str] 
         # Spawn isolated python subprocess in work_dir with UTF-8 environment
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
+        env["CODEBOOK_SESSION_ID"] = session_id or "default"
+        env["CODEBOOK_RUNNER_PORT"] = os.environ.get("PORT", "8000")
         
         result = subprocess.run(
             [sys.executable, script_path],
