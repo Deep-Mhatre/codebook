@@ -5,14 +5,17 @@ import { TextOutput } from './text-output';
 import { ErrorOutput } from './error-output';
 import { TableOutput, TableData } from './table-output';
 import { ImageOutput } from './image-output';
+import { PlotlyOutputRenderer, HTMLOutputRenderer, WebGLOutputRenderer } from './interactive-output';
 
-export type OutputType = 'text' | 'error' | 'table' | 'image';
+export type OutputType = 'text' | 'error' | 'table' | 'image' | 'plotly' | 'html' | 'webgl';
 
 export interface OutputItem {
   type: OutputType;
   content?: string;
   tableData?: TableData;
   imageUrl?: string;
+  spec?: any;
+  data?: any;
 }
 
 interface OutputBlockProps {
@@ -35,6 +38,9 @@ export function OutputBlock({ outputs }: OutputBlockProps) {
             {out.type === 'error' && out.content && <ErrorOutput content={out.content} />}
             {out.type === 'table' && out.tableData && <TableOutput data={out.tableData} />}
             {out.type === 'image' && out.imageUrl && <ImageOutput src={out.imageUrl} />}
+            {out.type === 'plotly' && out.spec && <PlotlyOutputRenderer spec={out.spec} />}
+            {out.type === 'html' && out.content && <HTMLOutputRenderer content={out.content} />}
+            {out.type === 'webgl' && out.data && <WebGLOutputRenderer data={out.data} />}
           </div>
         ))}
       </div>

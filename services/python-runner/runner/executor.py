@@ -4,7 +4,10 @@ import tempfile
 import os
 import time
 from typing import Optional
-from .parser import parse_execution_output
+try:
+    from .parser import parse_execution_output
+except ImportError:
+    from parser import parse_execution_output
 
 # Auto-injection code wrapper for headless Matplotlib, Pandas, Polars, and UTF-8 stdout execution
 CODE_WRAPPER = """

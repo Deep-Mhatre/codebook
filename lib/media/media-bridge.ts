@@ -1,6 +1,6 @@
 /**
  * CodeBook Frontend Media Bridge
- * Handles browser camera frame capture & microphone recording via HTML5 Media APIs.
+ * Handles browser camera frame capture, streaming & microphone recording/streaming via HTML5 Media APIs.
  */
 
 export interface MediaCaptureError {
@@ -173,4 +173,133 @@ export async function recordMicrophoneAudio(
       stream.getTracks().forEach((track) => track.stop());
     }
   }
+}
+
+/**
+ * Continuously streams camera frames at target FPS over onFrame callback.
+ * Returns a stopStream cleanup function to cancel streaming and close media tracks.
+ */
+export function streamCameraFrames(
+  fps: number = 30,
+  onFrame: (dataUrl: string) => void,
+  onError?: (err: MediaCaptureError) => void
+): () => void {
+  let isStreaming = true;
+  let mediaStream: MediaStream | null = null;
+  let timerId: any = null;
+
+  async function start() {
+    try {
+      if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        if (onError) {
+          onError({ errorType: 'unsupported', message: 'Browser does not support mediaDevices API.' });
+        }
+        return;
+      }
+
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+        audio: false,
+      });
+
+      const video = document.createElement('video');
+      video.srcObject = mediaStream;
+      video.setAttribute('playsinline', 'true');
+      video.muted = true;
+      await video.play();
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+
+      const intervalMs = Math.max(16, Math.floor(1000 / fps));
+
+      timerId = setInterval(() => {
+        if (!isStreaming || !ctx) return;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        onFrame(dataUrl);
+      }, intervalMs);
+    } catch (err: any) {
+      if (onError) {
+        onError({
+          errorType: 'permission_denied',
+          message: err?.message || 'Failed to start camera stream',
+        });
+      }
+    }
+  }
+
+  start();
+
+  return () => {
+    isStreaming = false;
+    if (timerId) clearInterval(timerId);
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((track) => track.stop());
+    }
+  };
+}
+
+/**
+ * Continuously streams PCM float32 microphone audio chunks over onAudioChunk callback.
+ * Returns a stopAudioStream cleanup function to cancel streaming and close media tracks.
+ */
+export function streamMicrophoneAudio(
+  chunkSeconds: number = 0.1,
+  onAudioChunk: (base64Audio: string, sampleRate: number) => void,
+  onError?: (err: MediaCaptureError) => void
+): () => void {
+  let isStreaming = true;
+  let mediaStream: MediaStream | null = null;
+  let audioContext: AudioContext | null = null;
+
+  async function start() {
+    try {
+      if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        if (onError) {
+          onError({ errorType: 'unsupported', message: 'Browser does not support mediaDevices API.' });
+        }
+        return;
+      }
+
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const sampleRate = audioContext.sampleRate || 44100;
+      const mediaRecorder = new MediaRecorder(mediaStream);
+
+      const intervalMs = Math.max(50, Math.floor(chunkSeconds * 1000));
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (!isStreaming || e.data.size === 0) return;
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (reader.result && typeof reader.result === 'string') {
+            onAudioChunk(reader.result, sampleRate);
+          }
+        };
+        reader.readAsDataURL(e.data);
+      };
+
+      mediaRecorder.start(intervalMs);
+    } catch (err: any) {
+      if (onError) {
+        onError({
+          errorType: 'permission_denied',
+          message: err?.message || 'Failed to start microphone stream',
+        });
+      }
+    }
+  }
+
+  start();
+
+  return () => {
+    isStreaming = false;
+    if (audioContext) audioContext.close();
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((track) => track.stop());
+    }
+  };
 }

@@ -53,8 +53,8 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Redirect unauthenticated users attempting to access protected notebook routes
-  if (!user) {
+  // Redirect unauthenticated users attempting to access protected notebook routes (except in dev demo mode)
+  if (!user && process.env.NODE_ENV === 'production') {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);

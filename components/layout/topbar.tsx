@@ -5,6 +5,7 @@ import { Search, Sun, Moon, Settings, User, PanelLeftClose, PanelLeftOpen, Zap, 
 import { useUIStore } from '@/lib/store/ui-store';
 import { createClient } from '@/lib/auth/supabase-browser';
 import { useRouter } from 'next/navigation';
+import { StreamStatusBar } from '../media/stream-status-bar';
 
 interface TopbarProps {
   theme: 'light' | 'dark';
@@ -57,6 +58,11 @@ export function Topbar({ theme, onToggleTheme }: TopbarProps) {
           <span className="text-base font-serif">◈</span>
           <span className="font-semibold text-sm">CodeBook</span>
         </div>
+      </div>
+
+      {/* Center: Live Media Stream Security Status Bar */}
+      <div className="flex items-center">
+        <StreamStatusBar />
       </div>
 
       {/* Right: Search, Scratchpad, Theme Toggle, Settings, User */}

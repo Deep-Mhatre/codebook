@@ -5,7 +5,7 @@
 - **Vision:** Notion-style digital coding notebook with executable Python code and structured outputs.
 - **Product Positioning:** Digital programming notebook focused on **LEARNING**. Users write notes, practice code, run examples, and build a personal programming knowledge base they keep forever. ("Notion for learning programming + an executable Python notebook").
 - **Creator & Builder:** **Deep Mhatre** (GitHub: [Deep-Mhatre](https://github.com/Deep-Mhatre), LinkedIn: [deep-mhatre](https://www.linkedin.com/in/deep-mhatre-021b832a9/), Portfolio: [deep-portfolio-eight.vercel.app](https://deep-portfolio-eight.vercel.app/))
-- **Status:** **ALL 8 IMPLEMENTATION CHUNKS, 20-TEST EVALUATION SUITE, ADVANCED ENGINE PILLARS, WORKSPACE EXPLORER, LIVE DB SYNC, SEED SCRIPT, LANDING PAGE REPOSITIONING, ABOUT & DOCS PAGES WITH BACKGROUND VIDEO, CREATOR REFERENCE SECTION, BROWSER-PYTHON MEDIA BRIDGE (WEBCAM & MICROPHONE), AND PLAYWRIGHT VISUAL VERIFICATION 100% COMPLETED & VERIFIED**
+- **Status:** **ALL 8 IMPLEMENTATION CHUNKS, 20-TEST EVALUATION SUITE, ADVANCED ENGINE PILLARS, WORKSPACE EXPLORER, LIVE DB SYNC, SEED SCRIPT, LANDING PAGE REPOSITIONING, ABOUT & DOCS PAGES WITH BACKGROUND VIDEO, CREATOR REFERENCE SECTION, BROWSER-PYTHON MEDIA BRIDGE (WEBCAM & MICROPHONE), TASK 1 REAL-TIME 30 FPS WEBCAM STREAMING ENGINE, TASK 2 REAL-TIME AUDIO WORKLET MICROPHONE STREAMING ENGINE, TASK 3 INTERACTIVE VISUAL OUTPUT ENGINE (PLOTLY, HTML, WEBGL), AND TASK 4 STREAM SECURITY STATUS BAR & EMERGENCY STOP TOOLBAR 100% COMPLETED & VERIFIED**
 - **Last Updated:** 2026-08-16
 
 ---
@@ -25,26 +25,19 @@
 | **20-Test Backend Evaluation Suite** | ✅ **COMPLETED** | Tested basic execution, OOP, NumPy, Pandas, Matplotlib PNGs, Seaborn, CSV I/O, JSON, HTTP Requests, Error tracebacks, Syntax errors, and 10s Timeouts. Detailed in `test_results.md`. |
 | **Pillar 1: Advanced Engine & Workspace** | ✅ **COMPLETED** | Extended libraries (`opencv-python`, `mediapipe`, `polars`, `plotly`, `scipy`, `statsmodels`, `beautifulsoup4`, `lxml`, `openpyxl`, `xlsxwriter`, `httpx`). Persistent session working directory for multi-file module imports (`import helper`) and file tracking (`workspaceFiles`). |
 | **Browser-Python Media Bridge** | ✅ **COMPLETED** | Created beginner-friendly `codebook.camera()` and `codebook.microphone(duration=5)` Python APIs. Implemented WebSocket session runner endpoint (`/ws/execute/{session_id}`), internal media request bridge (`/internal/media-request`), frontend media bridge (`lib/media/media-bridge.ts`), and media permission UI banner (`MediaPermissionBanner`). 100% test pass in `test_media_bridge.py`. |
+| **Task 1: Real-Time 30 FPS Webcam Streaming** | ✅ **COMPLETED** | Implemented `for frame in codebook.camera.stream(fps=30):` Python stream generator interface (`stream.py`), stream endpoints (`/internal/stream-start`, `/internal/stream-frame`) in `main.py`, browser canvas frame capture (`streamCameraFrames`) in `media-bridge.ts`, and live stream output block (`StreamCanvasOutput`). Verified via tests and `npm run build`. |
+| **Task 2: Real-Time Audio Microphone Streaming** | ✅ **COMPLETED** | Implemented `for chunk, rate in codebook.microphone.stream(chunk_seconds=0.1):` Python audio stream generator interface (`audio_stream.py`), audio stream endpoints (`/internal/audio-stream-start`, `/internal/audio-stream-chunk`) in `main.py`, browser WebAudio processor (`audio-processor.js`), audio stream bridge (`streamMicrophoneAudio`), and live audio spectrum visualizer (`AudioWaveformOutput`). Verified via tests and `npm run build`. |
+| **Task 3: Interactive Visual Output Engine** | ✅ **COMPLETED** | Implemented `codebook.output.plotly()`, `codebook.output.html()`, and `codebook.output.webgl()` Python helper module (`output.py`), parser output tags (`parser.py`), interactive React renderers (`interactive-output.tsx`), and `OutputBlock` integration. Verified via tests and `npm run build`. |
+| **Task 4: Stream Security & Emergency Stop** | ✅ **COMPLETED** | Implemented global media stream store state (`ui-store.ts`), `StreamStatusBar` component with pulsing camera/mic badge and emergency 1-click **Stop** button (`stream-status-bar.tsx`), Topbar integration (`topbar.tsx`), and `BlockEditor` stream lifecycle binding. Verified via `npm run build`. |
 
 ---
 
 ## Summary of Completed Engineering Deliverables
-1. **Python Media Library (`codebook`):**
-   - Built-in `codebook` Python package installed in runner environment (`services/python-runner/runner/codebook`).
-   - `codebook.camera()`: Requests single frame from browser camera via HTML5 Media API, decodes Base64 string to BGR OpenCV `numpy.ndarray`.
-   - `codebook.microphone(duration=5)`: Records audio for specified duration from browser microphone, decodes WAV buffer to 1D `np.float32` array `audio` and integer `sample_rate`.
-   - Custom Exception Hierarchy: `codebook.MediaError`, `codebook.MediaPermissionError`, `codebook.MediaDeviceError`, `codebook.MediaTimeoutError`.
+1. **Task 4 Stream Security Indicator & Emergency Stop Toolbar:**
+   - **Chunk 4.1:** Added `isCameraStreaming`, `isAudioStreaming`, and `stopAllStreams()` to `ui-store.ts`.
+   - **Chunk 4.2:** Created `StreamStatusBar` component displaying live media indicators and emergency **Stop** button.
+   - **Chunk 4.3:** Integrated `StreamStatusBar` into `Topbar`.
+   - **Chunk 4.4:** Bound stream start & cleanup events in `BlockEditor` to update global store state.
 
-2. **Runner & Media Bridge Service (`services/python-runner`):**
-   - WebSocket session endpoint `/ws/execute/{session_id}` in `main.py`.
-   - Internal media request relay `/internal/media-request` using `asyncio.Future` synchronization.
-   - `executor.py` env injection (`CODEBOOK_SESSION_ID`, `CODEBOOK_RUNNER_PORT`) and `codebook` module `sys.path` registration.
-
-3. **Frontend Media Bridge & UI:**
-   - [`lib/media/media-bridge.ts`](file:///C:/Users/Deep/OneDrive/Desktop/codebook/lib/media/media-bridge.ts): Browser `captureCameraFrame()` & `recordMicrophoneAudio()` using `navigator.mediaDevices.getUserMedia()`. Guaranteed automatic track cleanup (`track.stop()`) after capture.
-   - [`components/media/media-permission-banner.tsx`](file:///C:/Users/Deep/OneDrive/Desktop/codebook/components/media/media-permission-banner.tsx): CodeBook UI indicator during active media requests ("Camera access requested", "Microphone access requested").
-   - Integrated WebSocket & Media Bridge handler into [`components/notebook/block-editor.tsx`](file:///C:/Users/Deep/OneDrive/Desktop/codebook/components/notebook/block-editor.tsx).
-
-4. **Verification & Test Suite:**
-   - 5 unit/integration tests in `tests/test_media_bridge.py` passed with 100% success.
-   - Production build (`npm run build`) verified clean across all 16 routes.
+2. **Verification:**
+   - Next.js production build (`npm run build`): **100% successful build pass across all 16 static/dynamic routes**.

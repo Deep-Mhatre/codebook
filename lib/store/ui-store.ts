@@ -18,6 +18,11 @@ interface UIState {
   isWorkspaceExplorerOpen: boolean;
   workspaceFiles: WorkspaceFile[];
   
+  // Media Streaming State
+  isCameraStreaming: boolean;
+  isAudioStreaming: boolean;
+  stopStreamCallback: (() => void) | null;
+
   // Actions
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -31,9 +36,13 @@ interface UIState {
   setWorkspaceExplorerOpen: (open: boolean) => void;
   toggleWorkspaceExplorer: () => void;
   setWorkspaceFiles: (files: WorkspaceFile[]) => void;
+  setCameraStreaming: (streaming: boolean) => void;
+  setAudioStreaming: (streaming: boolean) => void;
+  setStopStreamCallback: (cb: (() => void) | null) => void;
+  stopAllStreams: () => void;
 }
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>((set, get) => ({
   isSidebarOpen: true,
   activeNotebookId: 'default-notebook',
   activeTopicId: 'fundamentals',
@@ -49,6 +58,9 @@ export const useUIStore = create<UIState>((set) => ({
   isScratchpadOpen: false,
   isWorkspaceExplorerOpen: false,
   workspaceFiles: [],
+  isCameraStreaming: false,
+  isAudioStreaming: false,
+  stopStreamCallback: null,
 
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
@@ -84,4 +96,13 @@ export const useUIStore = create<UIState>((set) => ({
   setWorkspaceExplorerOpen: (open) => set({ isWorkspaceExplorerOpen: open }),
   toggleWorkspaceExplorer: () => set((state) => ({ isWorkspaceExplorerOpen: !state.isWorkspaceExplorerOpen })),
   setWorkspaceFiles: (files) => set({ workspaceFiles: files }),
+
+  setCameraStreaming: (streaming) => set({ isCameraStreaming: streaming }),
+  setAudioStreaming: (streaming) => set({ isAudioStreaming: streaming }),
+  setStopStreamCallback: (cb) => set({ stopStreamCallback: cb }),
+  stopAllStreams: () => {
+    const cb = get().stopStreamCallback;
+    if (cb) cb();
+    set({ isCameraStreaming: false, isAudioStreaming: false, stopStreamCallback: null });
+  },
 }));

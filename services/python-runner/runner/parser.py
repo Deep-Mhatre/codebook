@@ -6,7 +6,8 @@ import os
 def parse_execution_output(stdout_str: str, stderr_str: str, temp_dir: str):
     """
     Parses execution output and converts stdout, stderr, Pandas DataFrames,
-    and generated plot images into structured JSON protocol objects.
+    generated plot images, Plotly specs, HTML widgets, and WebGL meshes
+    into structured JSON protocol objects.
     """
     outputs = []
 
@@ -44,12 +45,46 @@ def parse_execution_output(stdout_str: str, stderr_str: str, temp_dir: str):
                 "type": "table",
                 "tableData": table_data
             })
-            # Remove DataFrame tag from text stdout
             stdout_str = re.sub(r"__CODEBOOK_DATAFRAME_START__(.*?)__CODEBOOK_DATAFRAME_END__", "", stdout_str, flags=re.DOTALL).strip()
         except Exception:
             pass
 
-    # 4. Standard text stdout
+    # 4. Check for Plotly chart output tag
+    for line in stdout_str.splitlines():
+        if line.startswith("__CODEBOOK_OUTPUT_PLOTLY__:"):
+            try:
+                spec_str = line.split("__CODEBOOK_OUTPUT_PLOTLY__:", 1)[1]
+                spec = json.loads(spec_str)
+                outputs.append({
+                    "type": "plotly",
+                    "spec": spec
+                })
+                stdout_str = stdout_str.replace(line, "").strip()
+            except Exception:
+                pass
+        elif line.startswith("__CODEBOOK_OUTPUT_HTML__:"):
+            try:
+                html_content = line.split("__CODEBOOK_OUTPUT_HTML__:", 1)[1]
+                outputs.append({
+                    "type": "html",
+                    "content": html_content
+                })
+                stdout_str = stdout_str.replace(line, "").strip()
+            except Exception:
+                pass
+        elif line.startswith("__CODEBOOK_OUTPUT_WEBGL__:"):
+            try:
+                data_str = line.split("__CODEBOOK_OUTPUT_WEBGL__:", 1)[1]
+                mesh_data = json.loads(data_str)
+                outputs.append({
+                    "type": "webgl",
+                    "data": mesh_data
+                })
+                stdout_str = stdout_str.replace(line, "").strip()
+            except Exception:
+                pass
+
+    # 5. Standard text stdout
     if stdout_str and stdout_str.strip():
         outputs.append({
             "type": "text",

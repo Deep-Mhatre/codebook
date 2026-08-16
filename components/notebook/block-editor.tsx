@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { CodeBlock, ExecutionStatus } from './code-block';
 import { OutputBlock, OutputItem } from './output/output-block';
 import { MediaPermissionBanner } from '../media/media-permission-banner';
-import { captureCameraFrame, recordMicrophoneAudio } from '@/lib/media/media-bridge';
+import { captureCameraFrame, recordMicrophoneAudio, streamCameraFrames, streamMicrophoneAudio } from '@/lib/media/media-bridge';
+import { StreamCanvasOutput } from './output/stream-canvas-output';
+import { AudioWaveformOutput } from './output/audio-waveform-output';
 import { Plus, Type, Code2, Heading2 } from 'lucide-react';
 import { useUIStore } from '@/lib/store/ui-store';
 
@@ -16,6 +18,8 @@ export interface BlockItem {
   executionStatus?: ExecutionStatus;
   outputs?: OutputItem[];
   mediaRequest?: { type: 'camera' | 'microphone'; duration?: number } | null;
+  streamingFrame?: string | null;
+  isAudioStreaming?: boolean;
 }
 
 interface BlockEditorProps {
@@ -52,7 +56,8 @@ export function BlockEditor({
 }: BlockEditorProps) {
   const [blocks, setBlocks] = useState<BlockItem[]>(initialBlocks);
   const [showAddMenuIndex, setShowAddMenuIndex] = useState<number | null>(null);
-  const { setWorkspaceFiles } = useUIStore();
+  const { setWorkspaceFiles, setCameraStreaming, setAudioStreaming, setStopStreamCallback } = useUIStore();
+  const activeStreamCleanupRef = useRef<(() => void) | null>(null);
 
   const handleUpdateContent = (id: string, newContent: string) => {
     const updated = blocks.map((b) => (b.id === id ? { ...b, content: newContent } : b));
@@ -60,16 +65,36 @@ export function BlockEditor({
     if (onBlocksChange) onBlocksChange(updated);
   };
 
+  const handleStopStream = () => {
+    if (activeStreamCleanupRef.current) {
+      activeStreamCleanupRef.current();
+      activeStreamCleanupRef.current = null;
+    }
+    setCameraStreaming(false);
+    setAudioStreaming(false);
+    setStopStreamCallback(null);
+    setBlocks((prev) => prev.map((b) => ({ ...b, isAudioStreaming: false, streamingFrame: null })));
+  };
+
   const handleExecuteCode = async (blockId: string, code: string) => {
-    // 1. Mark block status as 'running' & clear previous media banners
+    handleStopStream();
+
     setBlocks((prev) =>
-      prev.map((b) => (b.id === blockId ? { ...b, executionStatus: 'running', mediaRequest: null } : b))
+      prev.map((b) =>
+        b.id === blockId
+          ? {
+              ...b,
+              executionStatus: 'running',
+              mediaRequest: null,
+              streamingFrame: null,
+              isAudioStreaming: false,
+            }
+          : b
+      )
     );
 
-    // Attempt interactive WebSocket execution for camera & microphone support
     const wsUrl = `ws://localhost:8000/ws/execute/${pageId}`;
     let socket: WebSocket | null = null;
-    let wsSuccess = false;
 
     try {
       socket = new WebSocket(wsUrl);
@@ -91,15 +116,12 @@ export function BlockEditor({
           const msg = JSON.parse(event.data);
 
           if (msg.type === 'camera_request') {
-            // Show Camera Banner UI
             setBlocks((prev) =>
               prev.map((b) => (b.id === blockId ? { ...b, mediaRequest: { type: 'camera' } } : b))
             );
 
-            // Capture camera frame from browser
             const res = await captureCameraFrame();
 
-            // Clear Camera Banner UI
             setBlocks((prev) =>
               prev.map((b) => (b.id === blockId ? { ...b, mediaRequest: null } : b))
             );
@@ -124,20 +146,41 @@ export function BlockEditor({
                 })
               );
             }
+          } else if (msg.type === 'camera_stream_start') {
+            const fps = msg.fps || 30;
+            setCameraStreaming(true);
+
+            const stopStream = streamCameraFrames(
+              fps,
+              (frameDataUrl) => {
+                setBlocks((prev) =>
+                  prev.map((b) => (b.id === blockId ? { ...b, streamingFrame: frameDataUrl } : b))
+                );
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                  socket.send(
+                    JSON.stringify({
+                      type: 'camera_stream_frame',
+                      session_id: pageId,
+                      image_data: frameDataUrl,
+                    })
+                  );
+                }
+              }
+            );
+
+            activeStreamCleanupRef.current = stopStream;
+            setStopStreamCallback(handleStopStream);
           } else if (msg.type === 'microphone_request') {
             const duration = msg.duration || 5.0;
 
-            // Show Microphone Banner UI
             setBlocks((prev) =>
               prev.map((b) =>
                 b.id === blockId ? { ...b, mediaRequest: { type: 'microphone', duration } } : b
               )
             );
 
-            // Record audio from browser microphone
             const res = await recordMicrophoneAudio(duration);
 
-            // Clear Microphone Banner UI
             setBlocks((prev) =>
               prev.map((b) => (b.id === blockId ? { ...b, mediaRequest: null } : b))
             );
@@ -163,8 +206,34 @@ export function BlockEditor({
                 })
               );
             }
+          } else if (msg.type === 'microphone_stream_start') {
+            const chunkSeconds = msg.chunk_seconds || 0.1;
+            setAudioStreaming(true);
+
+            setBlocks((prev) =>
+              prev.map((b) => (b.id === blockId ? { ...b, isAudioStreaming: true } : b))
+            );
+
+            const stopAudioStream = streamMicrophoneAudio(
+              chunkSeconds,
+              (audioDataUrl, sampleRate) => {
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                  socket.send(
+                    JSON.stringify({
+                      type: 'microphone_stream_chunk',
+                      session_id: pageId,
+                      audio_data: audioDataUrl,
+                      sample_rate: sampleRate,
+                    })
+                  );
+                }
+              }
+            );
+
+            activeStreamCleanupRef.current = stopAudioStream;
+            setStopStreamCallback(handleStopStream);
           } else if (msg.type === 'execution_result') {
-            wsSuccess = true;
+            handleStopStream();
             const data = msg.data;
             if (data.workspaceFiles) {
               setWorkspaceFiles(data.workspaceFiles);
@@ -204,7 +273,6 @@ export function BlockEditor({
         }
       };
 
-      // Start execution over WebSocket
       socket.send(JSON.stringify({ type: 'execute', code, timeout: 35 }));
       return;
     } catch (wsErr) {
@@ -212,7 +280,6 @@ export function BlockEditor({
       if (socket) socket.close();
     }
 
-    // Fallback HTTP POST execution handler
     try {
       const res = await fetch('/api/execute', {
         method: 'POST',
@@ -290,7 +357,6 @@ export function BlockEditor({
     <div className="space-y-4">
       {blocks.map((block, index) => (
         <div key={block.id} className="group relative">
-          {/* Heading Block */}
           {block.type === 'heading' && (
             <h3
               contentEditable
@@ -302,7 +368,6 @@ export function BlockEditor({
             </h3>
           )}
 
-          {/* Text Block */}
           {block.type === 'text' && (
             <p
               contentEditable
@@ -314,13 +379,27 @@ export function BlockEditor({
             </p>
           )}
 
-          {/* Monaco Code Block */}
           {block.type === 'code' && (
             <div className="space-y-2">
               <MediaPermissionBanner
                 type={block.mediaRequest?.type || null}
                 duration={block.mediaRequest?.duration}
               />
+
+              {block.streamingFrame && (
+                <StreamCanvasOutput
+                  currentFrame={block.streamingFrame}
+                  fps={30}
+                  onStopStream={handleStopStream}
+                />
+              )}
+
+              {block.isAudioStreaming && (
+                <AudioWaveformOutput
+                  isStreaming={block.isAudioStreaming}
+                  onStopStream={handleStopStream}
+                />
+              )}
 
               <CodeBlock
                 id={block.id}
@@ -331,14 +410,12 @@ export function BlockEditor({
                 onRunCode={(code) => handleExecuteCode(block.id, code)}
               />
 
-              {/* Render Block Outputs */}
               {block.outputs && block.outputs.length > 0 && (
                 <OutputBlock outputs={block.outputs} />
               )}
             </div>
           )}
 
-          {/* Inline Add Block Handle (+) */}
           <div className="opacity-0 group-hover:opacity-100 flex items-center justify-center my-1 transition-opacity">
             <button
               onClick={() => setShowAddMenuIndex(showAddMenuIndex === index ? null : index)}
@@ -349,7 +426,6 @@ export function BlockEditor({
             </button>
           </div>
 
-          {/* Add Block Options Menu */}
           {showAddMenuIndex === index && (
             <div className="flex items-center justify-center gap-2 p-2 rounded-lg border border-[var(--border)] bg-[var(--card)] shadow-lg my-2 text-xs">
               <button
