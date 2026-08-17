@@ -101,3 +101,26 @@ export const blocksRelations = relations(blocks, ({ one }) => ({
     references: [pages.id],
   }),
 }));
+
+// 5. Symbols Table (AST Code Intelligence)
+export const symbols = pgTable(
+  'symbols',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    blockId: uuid('block_id')
+      .notNull()
+      .references(() => blocks.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 255 }).notNull(),
+    type: varchar('type', { length: 50 }).notNull(), // 'function' | 'class' | 'variable'
+    signature: text('signature'),
+    docstring: text('docstring'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('symbols_page_id_idx').on(table.pageId),
+    index('symbols_name_idx').on(table.name),
+  ]
+);

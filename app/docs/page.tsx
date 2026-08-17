@@ -392,6 +392,7 @@ export default function DocsPage() {
             <a href="#writing-notes" className="sidebar-link">Writing Notes</a>
             <a href="#running-python" className="sidebar-link">Running Python</a>
             <a href="#shortcuts" className="sidebar-link">Shortcuts</a>
+            <a href="#roadmap" className="sidebar-link">Future Enhancements</a>
           </div>
         </aside>
 
@@ -463,6 +464,44 @@ print(df)`}
                 </tr>
               </tbody>
             </table>
+          </section>
+
+          <section id="roadmap" className="doc-section">
+            <h2 className="section-heading" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span>5. Future Enhancements</span>
+              <span style={{
+                fontSize: '0.68rem',
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                color: '#f59e0b',
+                background: 'rgba(245, 158, 11, 0.15)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                padding: '0.2rem 0.6rem',
+                borderRadius: '9999px',
+                textTransform: 'uppercase'
+              }}>
+                Coming Soon
+              </span>
+            </h2>
+            <p className="section-text">
+              We are actively expanding CodeBook capabilities. The following features are designated as future enhancements and will be updated soon in upcoming releases:
+            </p>
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.08)',
+              border: '1px solid rgba(245, 158, 11, 0.25)',
+              borderRadius: '12px',
+              padding: '1.2rem 1.5rem',
+              color: 'rgba(255, 255, 255, 0.85)',
+              fontSize: '0.92rem',
+              lineHeight: '1.7'
+            }}>
+              <div style={{ fontWeight: 600, color: '#fbbf24', marginBottom: '0.4rem', fontSize: '0.98rem' }}>
+                📷 Computer Vision & Real-Time Camera AI (Under Development)
+              </div>
+              <p style={{ color: 'rgba(255, 255, 255, 0.75)' }}>
+                Built-in Computer Vision tasks (<code style={{ color: '#fef08a' }}>codebook.vision</code>), live webcam streaming overlays, MediaPipe hand & face landmark detection, and zero-config ML model inference are currently designated for a future feature release. Detailed API documentation and interactive vision blocks will be updated soon!
+              </p>
+            </div>
           </section>
         </main>
       </div>

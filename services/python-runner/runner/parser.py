@@ -11,13 +11,19 @@ def parse_execution_output(stdout_str: str, stderr_str: str, temp_dir: str):
     """
     outputs = []
 
-    # 1. Check for standard error / tracebacks
+    # 1. Check for standard error / tracebacks (ignoring C++ TFLite informational logs)
     if stderr_str and stderr_str.strip():
-        outputs.append({
-            "type": "error",
-            "content": stderr_str.strip()
-        })
-        return outputs
+        filtered_stderr_lines = [
+            line for line in stderr_str.splitlines()
+            if not (line.startswith("INFO:") or line.startswith("WARNING:") or line.startswith("W0000"))
+        ]
+        filtered_stderr = "\n".join(filtered_stderr_lines).strip()
+        if filtered_stderr:
+            outputs.append({
+                "type": "error",
+                "content": filtered_stderr
+            })
+            return outputs
 
     # 2. Check for generated plot images in temp directory
     plot_path = os.path.join(temp_dir, "plot.png")
@@ -79,6 +85,30 @@ def parse_execution_output(stdout_str: str, stderr_str: str, temp_dir: str):
                 outputs.append({
                     "type": "webgl",
                     "data": mesh_data
+                })
+                stdout_str = stdout_str.replace(line, "").strip()
+            except Exception:
+                pass
+        elif line.startswith("__CODEBOOK_WIDGET__:"):
+            try:
+                widget_str = line.split("__CODEBOOK_WIDGET__:", 1)[1]
+                widget_data = json.loads(widget_str)
+                outputs.append({
+                    "type": "widget",
+                    "widgetData": widget_data
+                })
+                stdout_str = stdout_str.replace(line, "").strip()
+            except Exception:
+                pass
+        elif line.startswith("__CODEBOOK_VISION_OVERLAY__:"):
+            stdout_str = stdout_str.replace(line, "").strip()
+        elif line.startswith("__CODEBOOK_TRACE__:"):
+            try:
+                trace_str = line.split("__CODEBOOK_TRACE__:", 1)[1]
+                trace_steps = json.loads(trace_str)
+                outputs.append({
+                    "type": "trace",
+                    "traceData": trace_steps
                 })
                 stdout_str = stdout_str.replace(line, "").strip()
             except Exception:

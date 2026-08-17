@@ -50,8 +50,9 @@ export async function captureCameraFrame(): Promise<{ dataUrl?: string; error?: 
     const dataUrl = canvas.toDataURL('image/png');
 
     return { dataUrl };
-  } catch (err: any) {
-    const name = err?.name || '';
+  } catch (err: unknown) {
+    const errorObj = err as { name?: string; message?: string };
+    const name = errorObj?.name || '';
     if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
       return {
         error: {
@@ -70,12 +71,12 @@ export async function captureCameraFrame(): Promise<{ dataUrl?: string; error?: 
       return {
         error: {
           errorType: 'unknown',
-          message: err?.message || 'Failed to capture frame from browser camera.',
+          message: errorObj?.message || 'Failed to capture frame from browser camera.',
         },
       };
     }
   } finally {
-    // ALWAYS stop all camera media tracks after capture
+    // ALWAYS stop all video media tracks after capture
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
     }
@@ -83,7 +84,7 @@ export async function captureCameraFrame(): Promise<{ dataUrl?: string; error?: 
 }
 
 /**
- * Requests browser microphone permission, records audio for durationSeconds, and stops all tracks immediately.
+ * Requests browser microphone permission, records audio for durationSeconds, and returns a Base64 data URL.
  */
 export async function recordMicrophoneAudio(
   durationSeconds: number = 5.0
@@ -104,7 +105,8 @@ export async function recordMicrophoneAudio(
       video: false,
     });
 
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioContext = new AudioContextClass();
     const sampleRate = audioContext.sampleRate || 44100;
 
     const mediaRecorder = new MediaRecorder(stream);
@@ -143,8 +145,9 @@ export async function recordMicrophoneAudio(
     const dataUrl = await dataUrlPromise;
 
     return { dataUrl, sampleRate };
-  } catch (err: any) {
-    const name = err?.name || '';
+  } catch (err: unknown) {
+    const errorObj = err as { name?: string; message?: string };
+    const name = errorObj?.name || '';
     if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
       return {
         error: {
@@ -163,7 +166,7 @@ export async function recordMicrophoneAudio(
       return {
         error: {
           errorType: 'unknown',
-          message: err?.message || 'Failed to record audio from browser microphone.',
+          message: errorObj?.message || 'Failed to record audio from browser microphone.',
         },
       };
     }
@@ -186,7 +189,7 @@ export function streamCameraFrames(
 ): () => void {
   let isStreaming = true;
   let mediaStream: MediaStream | null = null;
-  let timerId: any = null;
+  let timerId: ReturnType<typeof setInterval> | null = null;
 
   async function start() {
     try {
@@ -221,11 +224,12 @@ export function streamCameraFrames(
         const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
         onFrame(dataUrl);
       }, intervalMs);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (onError) {
+        const errorObj = err as { message?: string };
         onError({
           errorType: 'permission_denied',
-          message: err?.message || 'Failed to start camera stream',
+          message: errorObj?.message || 'Failed to start camera stream',
         });
       }
     }
@@ -243,12 +247,12 @@ export function streamCameraFrames(
 }
 
 /**
- * Continuously streams PCM float32 microphone audio chunks over onAudioChunk callback.
- * Returns a stopAudioStream cleanup function to cancel streaming and close media tracks.
+ * Continuously streams microphone audio chunks over onAudioChunk callback.
+ * Returns a stopStream cleanup function to cancel streaming and close media tracks.
  */
 export function streamMicrophoneAudio(
   chunkSeconds: number = 0.1,
-  onAudioChunk: (base64Audio: string, sampleRate: number) => void,
+  onAudioChunk: (audioDataUrl: string, sampleRate: number) => void,
   onError?: (err: MediaCaptureError) => void
 ): () => void {
   let isStreaming = true;
@@ -265,7 +269,8 @@ export function streamMicrophoneAudio(
       }
 
       mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      audioContext = new AudioContextClass();
       const sampleRate = audioContext.sampleRate || 44100;
       const mediaRecorder = new MediaRecorder(mediaStream);
 
@@ -283,11 +288,12 @@ export function streamMicrophoneAudio(
       };
 
       mediaRecorder.start(intervalMs);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (onError) {
+        const errorObj = err as { message?: string };
         onError({
           errorType: 'permission_denied',
-          message: err?.message || 'Failed to start microphone stream',
+          message: errorObj?.message || 'Failed to start microphone stream',
         });
       }
     }

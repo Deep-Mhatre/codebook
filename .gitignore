@@ -43,4 +43,6 @@ next-env.d.ts
 # playwright & testing screenshots
 .playwright-mcp/
 *.png
-
+# python
+__pycache__/
+*.pyc

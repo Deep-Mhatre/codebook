@@ -14,7 +14,10 @@ export function useAutoSave<T>({ data, onSave, delay = 1500 }: AutoSaveOptions<T
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const isFirstRender = useRef(true);
   const latestDataRef = useRef(data);
-  latestDataRef.current = data;
+
+  useEffect(() => {
+    latestDataRef.current = data;
+  }, [data]);
 
   const performSave = useCallback(async () => {
     setIsSaving(true);

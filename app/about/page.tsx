@@ -479,10 +479,10 @@ export default function AboutPage() {
 
         {/* Builder's Reference Section */}
         <section className="creator-box">
-          <div className="creator-eyebrow">THE BUILDER'S STORY</div>
+          <div className="creator-eyebrow">THE BUILDER&apos;S STORY</div>
           <h2 className="creator-title">How CodeBook Was Built</h2>
           <p className="creator-text">
-            CodeBook was designed and built by <strong>Deep Mhatre</strong> out of a personal need for a frictionless learning environment. Traditional IDEs feel heavy and overwhelming when you just want to take notes and test code snippets, while static note apps don't let you run real code.
+            CodeBook was designed and built by <strong>Deep Mhatre</strong> out of a personal need for a frictionless learning environment. Traditional IDEs feel heavy and overwhelming when you just want to take notes and test code snippets, while static note apps don&apos;t let you run real code.
           </p>
           <p className="creator-text">
             Architected with <strong>Next.js 16</strong>, <strong>Monaco Editor</strong>, a standalone <strong>FastAPI Python 3.11 runner</strong>, <strong>Drizzle ORM</strong>, and <strong>Supabase Auth</strong>, CodeBook bridges the gap between digital notebooks and live execution kernels.

@@ -3,7 +3,7 @@
 import React from 'react';
 
 interface PlotlyOutputProps {
-  spec: any;
+  spec: Record<string, unknown>;
 }
 
 interface HTMLOutputProps {
@@ -11,12 +11,14 @@ interface HTMLOutputProps {
 }
 
 interface WebGLOutputProps {
-  data: any;
+  data: Record<string, unknown>;
 }
 
 export function PlotlyOutputRenderer({ spec }: PlotlyOutputProps) {
-  const title = spec?.layout?.title || 'Interactive Plotly Visualization';
-  const dataCount = spec?.data?.length || 0;
+  const layout = spec?.layout as Record<string, unknown> | undefined;
+  const data = spec?.data as unknown[] | undefined;
+  const title = (layout?.title as string) || 'Interactive Plotly Visualization';
+  const dataCount = data?.length || 0;
 
   return (
     <div className="my-3 p-4 rounded-lg border border-[var(--border)] bg-[var(--code-bg)] space-y-3">

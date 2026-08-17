@@ -4,9 +4,21 @@ import { blocks } from '@/lib/db/schema';
 import { syncBlocksSchema } from '@/lib/validation/schemas';
 import { eq } from 'drizzle-orm';
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+
+    // Handle non-UUID page IDs (e.g., 'page-variables' or demo pages) gracefully
+    if (!UUID_REGEX.test(id)) {
+      return NextResponse.json({
+        success: true,
+        blocks: [],
+        isLocalFallback: true,
+      });
+    }
+
     const pageBlocks = await db
       .select()
       .from(blocks)
@@ -14,8 +26,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .orderBy(blocks.position);
 
     return NextResponse.json({ success: true, blocks: pageBlocks });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const errorObj = error as { message?: string };
+    return NextResponse.json({ success: false, error: errorObj?.message || 'Failed to fetch page blocks' }, { status: 500 });
   }
 }
 
@@ -25,7 +38,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const body = await req.json();
     const validatedData = syncBlocksSchema.parse(body);
 
-    // Delete existing blocks for page and insert updated block array
+    // Handle non-UUID page IDs (e.g., 'page-variables' or demo pages) gracefully
+    if (!UUID_REGEX.test(id)) {
+      return NextResponse.json({
+        success: true,
+        message: 'Local session synchronized',
+        isLocalFallback: true,
+      });
+    }
+
+    // Delete existing blocks for page and insert updated block array with sequential re-indexing (0, 1, 2...)
     await db.delete(blocks).where(eq(blocks.pageId, id));
 
     if (validatedData.blocks.length > 0) {
@@ -35,13 +57,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           type: b.type,
           content: b.content,
           language: b.language || 'python',
-          position: index,
+          position: index, // Enforces 0-indexed sequential ordering on save
         }))
       );
     }
 
     return NextResponse.json({ success: true, message: 'Blocks synchronized successfully' });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  } catch (error: unknown) {
+    const errorObj = error as { message?: string };
+    return NextResponse.json({ success: false, error: errorObj?.message || 'Failed to sync blocks' }, { status: 400 });
   }
 }

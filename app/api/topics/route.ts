@@ -20,8 +20,9 @@ export async function GET(req: NextRequest) {
       .orderBy(topics.position);
 
     return NextResponse.json({ success: true, topics: topicList });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const errorObj = error as { message?: string };
+    return NextResponse.json({ success: false, error: errorObj?.message || 'Failed to fetch topics' }, { status: 500 });
   }
 }
 
@@ -41,7 +42,8 @@ export async function POST(req: NextRequest) {
       .returning();
 
     return NextResponse.json({ success: true, topic: newTopic }, { status: 201 });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  } catch (error: unknown) {
+    const errorObj = error as { message?: string };
+    return NextResponse.json({ success: false, error: errorObj?.message || 'Invalid topic data' }, { status: 400 });
   }
 }

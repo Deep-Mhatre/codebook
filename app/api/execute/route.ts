@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executeCodeSchema } from '@/lib/validation/schemas';
 
-const PYTHON_RUNNER_URL = process.env.PYTHON_RUNNER_URL || 'http://localhost:8000';
+const PYTHON_RUNNER_URL = process.env.PYTHON_RUNNER_URL || 'http://127.0.0.1:8000';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       }
     } catch (runnerError) {
       // Fallback local runner response if standalone service is not active
-      console.warn('Python Runner service offline, using fallback execution handler.');
+      console.warn('Python Runner service offline, using fallback execution handler:', runnerError);
     }
 
     // Demo / Fallback Execution Handler
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     const code = validatedData.code;
 
     // Simulate stdout / pandas / error output parsing
-    let outputs = [];
+    const outputs = [];
 
     if (code.includes('Error') || code.includes('unknown_variable')) {
       outputs.push({
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     } else {
       outputs.push({
         type: 'text',
-        content: 'User: Ghost\nAge: 22',
+        content: `Executed code:\n${code}`,
       });
     }
 
@@ -63,9 +63,10 @@ export async function POST(req: NextRequest) {
       executionTime,
       outputs,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorObj = error as { message?: string };
     return NextResponse.json(
-      { success: false, error: error.message || 'Execution error' },
+      { success: false, error: errorObj?.message || 'Execution error' },
       { status: 400 }
     );
   }

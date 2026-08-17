@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Save, Check, RefreshCw, Folder } from 'lucide-react';
+import { Save, Check, RefreshCw, Folder, FileUp, FileDown } from 'lucide-react';
 import { useUIStore } from '@/lib/store/ui-store';
 
 interface PageHeaderProps {
@@ -13,6 +13,8 @@ interface PageHeaderProps {
   isDirty?: boolean;
   onTitleChange?: (newTitle: string) => void;
   onSave?: () => void;
+  onImportIpynb?: (content: string) => void;
+  onExportIpynb?: () => void;
 }
 
 export function PageHeader({
@@ -24,6 +26,8 @@ export function PageHeader({
   isDirty = false,
   onTitleChange,
   onSave,
+  onImportIpynb,
+  onExportIpynb,
 }: PageHeaderProps) {
   const { toggleWorkspaceExplorer, workspaceFiles } = useUIStore();
 
@@ -55,6 +59,43 @@ export function PageHeader({
               </span>
             )}
           </button>
+
+          {/* Import .ipynb Button */}
+          {onImportIpynb && (
+            <label className="flex items-center gap-1 px-2 py-1 text-xs border border-[var(--border)] bg-[var(--sidebar)] hover:bg-[var(--hover)] text-[var(--foreground)] rounded-md font-medium transition-colors cursor-pointer" title="Import Jupyter (.ipynb) Notebook">
+              <FileUp className="w-3.5 h-3.5 text-blue-500" />
+              <span className="hidden sm:inline">Import .ipynb</span>
+              <input
+                type="file"
+                accept=".ipynb"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                      if (evt.target?.result) {
+                        onImportIpynb(evt.target.result as string);
+                      }
+                    };
+                    reader.readAsText(file);
+                  }
+                }}
+              />
+            </label>
+          )}
+
+          {/* Export .ipynb Button */}
+          {onExportIpynb && (
+            <button
+              onClick={onExportIpynb}
+              className="flex items-center gap-1 px-2 py-1 text-xs border border-[var(--border)] bg-[var(--sidebar)] hover:bg-[var(--hover)] text-[var(--foreground)] rounded-md font-medium transition-colors cursor-pointer"
+              title="Export to Jupyter (.ipynb) Format"
+            >
+              <FileDown className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="hidden sm:inline">Export .ipynb</span>
+            </button>
+          )}
 
           {/* Status Badge */}
           <div className="text-xs flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-[var(--border)] bg-[var(--sidebar)] text-[var(--muted-foreground)]">

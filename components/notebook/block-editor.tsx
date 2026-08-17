@@ -1,14 +1,18 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { CodeBlock, ExecutionStatus } from './code-block';
 import { OutputBlock, OutputItem } from './output/output-block';
 import { MediaPermissionBanner } from '../media/media-permission-banner';
 import { captureCameraFrame, recordMicrophoneAudio, streamCameraFrames, streamMicrophoneAudio } from '@/lib/media/media-bridge';
 import { StreamCanvasOutput } from './output/stream-canvas-output';
 import { AudioWaveformOutput } from './output/audio-waveform-output';
+import { DAGStatusIndicator } from './dag-status-indicator';
 import { Plus, Type, Code2, Heading2 } from 'lucide-react';
 import { useUIStore } from '@/lib/store/ui-store';
+
+import { routeAndExecuteCode } from '@/lib/engine/execution-router';
+import { buildPageDAG, getStaleBlockIds } from '@/lib/engine/dag-analyzer';
 
 export interface BlockItem {
   id: string;
@@ -16,6 +20,7 @@ export interface BlockItem {
   content: string;
   language?: string;
   executionStatus?: ExecutionStatus;
+  executionEngine?: 'WASM_PYODIDE' | 'CLOUD_DOCKER';
   outputs?: OutputItem[];
   mediaRequest?: { type: 'camera' | 'microphone'; duration?: number } | null;
   streamingFrame?: string | null;
@@ -56,12 +61,24 @@ export function BlockEditor({
 }: BlockEditorProps) {
   const [blocks, setBlocks] = useState<BlockItem[]>(initialBlocks);
   const [showAddMenuIndex, setShowAddMenuIndex] = useState<number | null>(null);
+  const [staleBlockIds, setStaleBlockIds] = useState<Set<string>>(new Set());
   const { setWorkspaceFiles, setCameraStreaming, setAudioStreaming, setStopStreamCallback } = useUIStore();
   const activeStreamCleanupRef = useRef<(() => void) | null>(null);
+
+  const dagNodes = useMemo(() => {
+    const codeBlocks = blocks.filter((b) => b.type === 'code').map((b) => ({ id: b.id, code: b.content }));
+    return buildPageDAG(codeBlocks);
+  }, [blocks]);
 
   const handleUpdateContent = (id: string, newContent: string) => {
     const updated = blocks.map((b) => (b.id === id ? { ...b, content: newContent } : b));
     setBlocks(updated);
+
+    const staleDeps = getStaleBlockIds(id, dagNodes);
+    if (staleDeps.size > 0) {
+      setStaleBlockIds((prev) => new Set([...prev, ...staleDeps]));
+    }
+
     if (onBlocksChange) onBlocksChange(updated);
   };
 
@@ -73,11 +90,16 @@ export function BlockEditor({
     setCameraStreaming(false);
     setAudioStreaming(false);
     setStopStreamCallback(null);
-    setBlocks((prev) => prev.map((b) => ({ ...b, isAudioStreaming: false, streamingFrame: null })));
+    setBlocks((prev) => prev.map((b) => ({ ...b, isAudioStreaming: false })));
   };
 
   const handleExecuteCode = async (blockId: string, code: string) => {
     handleStopStream();
+    setStaleBlockIds((prev) => {
+      const next = new Set(prev);
+      next.delete(blockId);
+      return next;
+    });
 
     setBlocks((prev) =>
       prev.map((b) =>
@@ -85,6 +107,7 @@ export function BlockEditor({
           ? {
               ...b,
               executionStatus: 'running',
+              outputs: [],
               mediaRequest: null,
               streamingFrame: null,
               isAudioStreaming: false,
@@ -93,14 +116,15 @@ export function BlockEditor({
       )
     );
 
-    const wsUrl = `ws://localhost:8000/ws/execute/${pageId}`;
-    let socket: WebSocket | null = null;
+    const executeCloudDocker = async () => {
+      const wsUrl = `ws://127.0.0.1:8000/ws/execute/${pageId}`;
+      let socket: WebSocket | null = null;
 
     try {
       socket = new WebSocket(wsUrl);
 
       await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('WS timeout')), 1500);
+        const timeout = setTimeout(() => reject(new Error('WS timeout')), 5000);
         socket!.onopen = () => {
           clearTimeout(timeout);
           resolve();
@@ -246,6 +270,7 @@ export function BlockEditor({
                     ? {
                         ...b,
                         executionStatus: 'success',
+                        executionEngine: 'CLOUD_DOCKER',
                         outputs: data.outputs,
                         mediaRequest: null,
                       }
@@ -259,6 +284,7 @@ export function BlockEditor({
                     ? {
                         ...b,
                         executionStatus: 'error',
+                        executionEngine: 'CLOUD_DOCKER',
                         outputs: data.outputs || [{ type: 'error', content: data.error || 'Execution failed' }],
                         mediaRequest: null,
                       }
@@ -300,6 +326,7 @@ export function BlockEditor({
               ? {
                   ...b,
                   executionStatus: 'success',
+                  executionEngine: 'CLOUD_DOCKER',
                   outputs: data.outputs,
                   mediaRequest: null,
                 }
@@ -313,6 +340,7 @@ export function BlockEditor({
               ? {
                   ...b,
                   executionStatus: 'error',
+                  executionEngine: 'CLOUD_DOCKER',
                   outputs: [{ type: 'error', content: data.error || 'Execution failed' }],
                   mediaRequest: null,
                 }
@@ -320,14 +348,15 @@ export function BlockEditor({
           )
         );
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string };
       setBlocks((prev) =>
         prev.map((b) =>
           b.id === blockId
             ? {
                 ...b,
                 executionStatus: 'error',
-                outputs: [{ type: 'error', content: err.message || 'Network error' }],
+                outputs: [{ type: 'error', content: errorObj?.message || 'Network error' }],
                 mediaRequest: null,
               }
             : b
@@ -336,9 +365,46 @@ export function BlockEditor({
     }
   };
 
+    const routeRes = await routeAndExecuteCode({
+      code,
+      pageId,
+      executeCloudDocker,
+    });
+
+    if (routeRes.handledLocally && routeRes.result) {
+      const wasmRes = routeRes.result;
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId
+            ? {
+                ...b,
+                executionStatus: wasmRes.status === 'success' ? 'success' : 'error',
+                executionEngine: 'WASM_PYODIDE',
+                outputs: wasmRes.outputs,
+                mediaRequest: null,
+              }
+            : b
+        )
+      );
+    }
+  };
+
+  const handleWidgetChange = (blockId: string, widgetId: string, newValue: unknown) => {
+    const targetBlock = blocks.find((b) => b.id === blockId);
+    if (targetBlock && targetBlock.type === 'code') {
+      const envPattern = new RegExp(`# CodeBook UI Widget State\\s*import os\\s*os\\.environ\\["CODEBOOK_UI_${widgetId}"\\] = [^\\n]+\\n*`, 'g');
+      const cleanCode = targetBlock.content.replace(envPattern, '');
+      const envPrefix = `# CodeBook UI Widget State\nimport os\nos.environ["CODEBOOK_UI_${widgetId}"] = ${JSON.stringify(String(newValue))}\n\n`;
+      const updatedCode = envPrefix + cleanCode;
+
+      handleUpdateContent(blockId, updatedCode);
+      handleExecuteCode(blockId, updatedCode);
+    }
+  };
+
   const handleAddBlock = (index: number, type: 'text' | 'heading' | 'code') => {
     const newBlock: BlockItem = {
-      id: `block-${Date.now()}`,
+      id: `block_${index}_${blocks.length + 1}`,
       type,
       content: type === 'code' ? 'print("New code snippet")' : '',
       language: type === 'code' ? 'python' : undefined,
@@ -381,6 +447,13 @@ export function BlockEditor({
 
           {block.type === 'code' && (
             <div className="space-y-2">
+              <DAGStatusIndicator
+                isStale={staleBlockIds.has(block.id)}
+                dependsOnCount={dagNodes.get(block.id)?.dependsOnBlockIds.length || 0}
+                dependentCount={dagNodes.get(block.id)?.dependentBlockIds.length || 0}
+                onRunDependent={() => handleExecuteCode(block.id, block.content)}
+              />
+
               <MediaPermissionBanner
                 type={block.mediaRequest?.type || null}
                 duration={block.mediaRequest?.duration}
@@ -406,12 +479,16 @@ export function BlockEditor({
                 initialCode={block.content}
                 language={block.language || 'python'}
                 status={block.executionStatus || 'idle'}
+                executionEngine={block.executionEngine}
                 onCodeChange={(code) => handleUpdateContent(block.id, code)}
                 onRunCode={(code) => handleExecuteCode(block.id, code)}
               />
 
               {block.outputs && block.outputs.length > 0 && (
-                <OutputBlock outputs={block.outputs} />
+                <OutputBlock
+                  outputs={block.outputs}
+                  onWidgetChange={(wId, val) => handleWidgetChange(block.id, wId, val)}
+                />
               )}
             </div>
           )}

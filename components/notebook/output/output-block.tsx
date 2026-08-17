@@ -6,23 +6,29 @@ import { ErrorOutput } from './error-output';
 import { TableOutput, TableData } from './table-output';
 import { ImageOutput } from './image-output';
 import { PlotlyOutputRenderer, HTMLOutputRenderer, WebGLOutputRenderer } from './interactive-output';
+import { UIWidgetRenderer, UIWidgetData } from '../widgets/ui-widget-renderer';
+import { ExecutionTimeline, TraceStep } from '../debugger/execution-timeline';
 
-export type OutputType = 'text' | 'error' | 'table' | 'image' | 'plotly' | 'html' | 'webgl';
+export type OutputType = 'text' | 'error' | 'table' | 'image' | 'plotly' | 'html' | 'webgl' | 'widget' | 'trace';
 
 export interface OutputItem {
   type: OutputType;
   content?: string;
   tableData?: TableData;
   imageUrl?: string;
-  spec?: any;
-  data?: any;
+  spec?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+  widgetData?: UIWidgetData;
+  traceData?: TraceStep[];
 }
 
 interface OutputBlockProps {
   outputs: OutputItem[];
+  onWidgetChange?: (widgetId: string, newValue: unknown) => void;
+  onTraceStepSelect?: (step: number, line: number) => void;
 }
 
-export function OutputBlock({ outputs }: OutputBlockProps) {
+export function OutputBlock({ outputs, onWidgetChange, onTraceStepSelect }: OutputBlockProps) {
   if (!outputs || outputs.length === 0) return null;
 
   return (
@@ -41,6 +47,12 @@ export function OutputBlock({ outputs }: OutputBlockProps) {
             {out.type === 'plotly' && out.spec && <PlotlyOutputRenderer spec={out.spec} />}
             {out.type === 'html' && out.content && <HTMLOutputRenderer content={out.content} />}
             {out.type === 'webgl' && out.data && <WebGLOutputRenderer data={out.data} />}
+            {out.type === 'widget' && out.widgetData && (
+              <UIWidgetRenderer widgetData={out.widgetData} onWidgetChange={onWidgetChange} />
+            )}
+            {out.type === 'trace' && out.traceData && (
+              <ExecutionTimeline traceData={out.traceData} onStepSelect={onTraceStepSelect} />
+            )}
           </div>
         ))}
       </div>

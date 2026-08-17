@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Requ
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
+import os
 import asyncio
 import logging
 
@@ -15,9 +16,12 @@ logger = logging.getLogger("python-runner")
 
 app = FastAPI(title="CodeBook Python Execution Runner & Media Bridge", version="1.4.0")
 
+allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -203,9 +207,9 @@ async def handle_stream_frame(session_id: str, frame_idx: int):
     if session_id in stream_frame_queues:
         queue = stream_frame_queues[session_id]
         try:
-            image_data = await asyncio.wait_for(queue.get(), timeout=1.0)
+            image_data = queue.get_nowait()
             return {"status": "success", "image_data": image_data, "frame_idx": frame_idx}
-        except asyncio.TimeoutError:
+        except asyncio.QueueEmpty:
             pass
 
     return {"status": "empty", "image_data": None, "frame_idx": frame_idx}
@@ -233,18 +237,25 @@ async def handle_audio_stream_chunk(session_id: str, chunk_idx: int):
     if session_id in audio_stream_queues:
         queue = audio_stream_queues[session_id]
         try:
-            chunk_data = await asyncio.wait_for(queue.get(), timeout=1.0)
+            chunk_data = queue.get_nowait()
             return {
                 "status": "success",
                 "audio_data": chunk_data.get("audio_data"),
                 "sample_rate": chunk_data.get("sample_rate", 44100),
                 "chunk_idx": chunk_idx
             }
-        except asyncio.TimeoutError:
+        except asyncio.QueueEmpty:
             pass
 
     return {"status": "empty", "audio_data": None, "sample_rate": 44100, "chunk_idx": chunk_idx}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("services.python-runner.runner.main:app", host="0.0.0.0", port=8000, reload=True)
+    import sys
+    import os
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    if current_dir not in sys.path:
+        sys.path.insert(0, current_dir)
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

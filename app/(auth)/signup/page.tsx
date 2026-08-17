@@ -32,8 +32,9 @@ export default function SignupPage() {
       setErrorMsg(error.message);
       setLoading(false);
     } else {
-      setSuccessMsg('Account created successfully! Check your email for confirmation or sign in.');
+      setSuccessMsg('Account created successfully! Redirecting...');
       setLoading(false);
+      setTimeout(() => router.push('/notebook'), 1500);
     }
   };
 

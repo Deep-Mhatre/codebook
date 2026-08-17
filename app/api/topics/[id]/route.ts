@@ -22,8 +22,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       .returning();
 
     return NextResponse.json({ success: true, topic: updatedTopic });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  } catch (error: unknown) {
+    const errorObj = error as { message?: string };
+    return NextResponse.json({ success: false, error: errorObj?.message || 'Failed to update topic' }, { status: 400 });
   }
 }
 
@@ -32,7 +33,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     await db.delete(topics).where(eq(topics.id, id));
     return NextResponse.json({ success: true, message: 'Topic deleted successfully' });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const errorObj = error as { message?: string };
+    return NextResponse.json({ success: false, error: errorObj?.message || 'Failed to delete topic' }, { status: 500 });
   }
 }

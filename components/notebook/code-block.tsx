@@ -7,21 +7,22 @@ import { Play, Copy, Check, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-
 export type ExecutionStatus = 'idle' | 'running' | 'success' | 'error';
 
 interface CodeBlockProps {
-  id: string;
+  id?: string;
   initialCode?: string;
   language?: string;
   onCodeChange?: (code: string) => void;
   onRunCode?: (code: string) => void;
   status?: ExecutionStatus;
+  executionEngine?: 'WASM_PYODIDE' | 'CLOUD_DOCKER';
 }
 
 export function CodeBlock({
-  id,
   initialCode = 'print("Hello CodeBook")',
   language = 'python',
   onCodeChange,
   onRunCode,
   status = 'idle',
+  executionEngine,
 }: CodeBlockProps) {
   const [code, setCode] = useState(initialCode);
   const [copied, setCopied] = useState(false);
@@ -47,7 +48,7 @@ export function CodeBlock({
   };
 
   // Keyboard shortcut listener inside Monaco Editor: Ctrl/Cmd + Enter
-  const handleEditorMount = (editor: any, monaco: any) => {
+  const handleEditorMount = (editor: { addCommand: (key: number, handler: () => void) => void }, monaco: { KeyMod: { CtrlCmd: number }, KeyCode: { Enter: number } }) => {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       handleRun();
     });
@@ -61,6 +62,16 @@ export function CodeBlock({
           <span className="font-semibold text-[var(--foreground)] uppercase text-[11px] tracking-wider">
             {language}
           </span>
+          {executionEngine === 'WASM_PYODIDE' && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+              <span>⚡</span> Wasm (Sub-10ms)
+            </span>
+          )}
+          {executionEngine === 'CLOUD_DOCKER' && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1">
+              <span>☁️</span> Cloud Docker
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2 text-[var(--muted-foreground)]">

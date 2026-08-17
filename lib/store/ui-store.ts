@@ -12,6 +12,8 @@ interface UIState {
   activeNotebookId: string | null;
   activeTopicId: string | null;
   activePageId: string | null;
+  activePageTitle: string;
+  activeTopicTitle: string;
   expandedTopicIds: Record<string, boolean>;
   isSearchOpen: boolean;
   isScratchpadOpen: boolean;
@@ -26,7 +28,7 @@ interface UIState {
   // Actions
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
-  setActivePage: (pageId: string, topicId?: string) => void;
+  setActivePage: (pageId: string, topicId?: string, pageTitle?: string, topicTitle?: string) => void;
   toggleTopicExpand: (topicId: string) => void;
   setTopicExpanded: (topicId: string, expanded: boolean) => void;
   setSearchOpen: (open: boolean) => void;
@@ -47,6 +49,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   activeNotebookId: 'default-notebook',
   activeTopicId: 'fundamentals',
   activePageId: 'page-variables',
+  activePageTitle: 'Variables & Data Types',
+  activeTopicTitle: 'Fundamentals',
   expandedTopicIds: {
     'fundamentals': true,
     'control-flow': false,
@@ -65,11 +69,13 @@ export const useUIStore = create<UIState>((set, get) => ({
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
   
-  setActivePage: (pageId, topicId) =>
-    set((state) => ({
+  setActivePage: (pageId, topicId, pageTitle, topicTitle) =>
+    set({
       activePageId: pageId,
       ...(topicId ? { activeTopicId: topicId } : {}),
-    })),
+      ...(pageTitle ? { activePageTitle: pageTitle } : {}),
+      ...(topicTitle ? { activeTopicTitle: topicTitle } : {}),
+    }),
 
   toggleTopicExpand: (topicId) =>
     set((state) => ({
